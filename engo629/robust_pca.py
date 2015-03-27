@@ -16,12 +16,23 @@ class ROBPCA(object):
     Rousseeuw, and Karlien Vandem Branden (2005)
     """
 
-    def __init__(self, X):
+    def __init__(self, X, kmax=10):
         """
         Initializes the class instance with the data you wish to compute the
         ROBPCA algorithm over.
+
+        Arguments:
+        ----------
+
+        X : An n x p data matrix (where n is number of data points and p is
+            number of dimensions in data) which is to be reduced.
+
+        kmax : Maximal number of components that will be computed. Set to 10
+               by default
         """
         self.data = X
+        self.kmax = kmax
+        return
 
     @staticmethod
     def reduce_to_affine_subspace(data):
