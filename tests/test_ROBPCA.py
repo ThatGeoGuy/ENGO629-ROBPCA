@@ -9,6 +9,8 @@ Tests functionality in robpca/ROBPCA.py
 
 import unittest
 
+from engo629 import ROBPCA
+
 class TestROBPCA(unittest.TestCase):
     """
     Tests the ROBPCA class and it's members. Should overall serve as tests to

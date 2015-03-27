@@ -11,7 +11,7 @@ from random import randint
 
 import numpy as np
 
-from robpca import pca
+from engo629 import pca
 
 class TestClassicalPCA(unittest.TestCase):
     """
