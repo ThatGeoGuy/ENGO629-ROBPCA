@@ -9,7 +9,7 @@ Tests functionality in robpca/ROBPCA.py
 
 import unittest
 
-from engo629 import ROBPCA
+from engo629.robust_pca import ROBPCA
 
 class TestROBPCA(unittest.TestCase):
     """

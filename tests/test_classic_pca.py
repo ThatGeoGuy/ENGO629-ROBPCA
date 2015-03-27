@@ -11,7 +11,7 @@ from random import randint
 
 import numpy as np
 
-from engo629 import pca
+from engo629.classic_pca import principal_components
 
 class TestClassicalPCA(unittest.TestCase):
     """
@@ -41,7 +41,7 @@ class TestClassicalPCA(unittest.TestCase):
         X[:, axis] = 0
 
         # Calculate PCs and respective variances
-        variances, PCs = pca.principal_components(X)
+        variances, PCs = principal_components(X)
         min_var        = np.min(variances)
         pc_min_var     = PCs[:, np.argmin(variances)]
 
