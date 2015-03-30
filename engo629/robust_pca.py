@@ -9,6 +9,8 @@ Peter J. Rousseeuw and Karlien Vandem Branden (2005)
 """
 
 import numpy as np
+from sklearn.covariance import MinCovDet
+from np.random import choice
 
 class ROBPCA(object):
     """
@@ -57,13 +59,15 @@ class ROBPCA(object):
             the mean-centred data matrix
         """
         centred_data = self.data - np.mean(self.data, axis=0)
-        U, D, V = np.linalg.svd(centred_data, False)
-        return U * D
+        U, s, V = np.linalg.svd(centred_data, False)
+        S = np.diag(s)
+        return U * S
 
     def num_least_outlying_points(self):
         """
         Determines the least number of outlying points h, which should be less
-        than n, our number of data points. `h` is computed as the maximum of either:
+        than n, our number of data points. `h` is computed as the maximum of
+        either:
 
             alpha * n           OR
             (n + kmax + 1) / 2
@@ -74,7 +78,59 @@ class ROBPCA(object):
         h : number of least outlying points.
         """
         n = self.data.shape[0]
-        return np.max([
-            self.alpha * n,
-            (n + self.kmax + 1) / 2,
-            ])
+        return np.max([self.alpha * n, (n + self.kmax + 1) / 2])
+
+    @staticmethod
+    def direction_coefficients_through_hyperplane(Z):
+        """
+        Calculates a direction vector between two points in Z, where Z is an
+        n x p matrix. This direction is projected upon to find the number of
+        least outlying points using the Stahel-Donoho outlyingness measure.
+
+        Arguments:
+        ----------
+
+        Z : Affine subspace of mean-centred data-matrix
+
+        Returns:
+        --------
+
+        p0 : point of origin of the direction vector d
+        d : direction vector between two points in Z
+        """
+        n = Z.shape[0]
+        p = Z.shape[1]
+
+        d = None
+        if n > p:
+            P    = np.array(Z[choice(n,p), :])
+            Q, R = np.linalg.qr(P)
+
+            if np.linalg.matrix_rank(Q) == p:
+                d = np.linalg.solve(Q, np.ones(p))
+        else:
+            P   = np.array(Z[choice(n,2), :])
+            tmp = P[1, :] - P[0, :]
+            N   = np.sqrt(np.dot(E,E))
+
+            if N > 1e-8:
+                d = tmp / N
+        return d
+
+    def find_least_outlying_points(self, Z):
+        """
+        Finds the `h` number of points in the dataset that are least-outlying.
+        Does this by first computing the modified Stahel-Donoho
+        affine-invariant outlyingness.
+
+        Arguments:
+        ----------
+
+        Z : Affine subspace of mean-centred data-matrix.
+
+        Returns:
+        --------
+
+        H0 : set of data points from self.data which have the least
+             outlyingness
+        """
