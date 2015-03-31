@@ -18,7 +18,7 @@ class ROBPCA(object):
     Rousseeuw, and Karlien Vandem Branden (2005)
     """
 
-    def __init__(self, X, kmax=10, alpha=0.75):
+    def __init__(self, X, kmax=10, alpha=0.75, mcd=True):
         """
         Initializes the class instance with the data you wish to compute the
         ROBPCA algorithm over.
@@ -26,8 +26,8 @@ class ROBPCA(object):
         Parameters
         ----------
 
-        X      : An n x p data matrix (where n is number of data points and p is
-                 number of dimensions in data) which is to be reduced.
+        X      : An n x p data matrix (where n is number of data points and p
+                 is number of dimensions in data) which is to be reduced.
         kmax   : Maximal number of components that will be computed. Set to 10
                  by default
         alpha  : Assists in determining step 2. The higher alpha is, the more
@@ -40,17 +40,15 @@ class ROBPCA(object):
         if not (0.5 <= alpha <= 1.0):
             raise ValueError("ROBPCA: alpha must be a value in the range [0.5, 1.0]")
 
-        self.data  = X
-        self.kmax  = kmax
-        self.alpha = alpha
+        self.data   = X
+        self.kmax   = kmax
+        self.alpha  = alpha
         return
 
     def reduce_to_affine_subspace(self):
         """
         Takes the mean-centred data-matrix and computes the affine subspace
-        spanned by n observations. That is, we take the singular value
-        decomposition of the mean-centred data-matrix and use Z = UD as our
-        new data matrix where Z is an n by r0 sized matrix.
+        spanned by n observations.
 
         Returns
         --------
@@ -58,18 +56,17 @@ class ROBPCA(object):
         Z : Z is the product of U and D of the singular value decomposition of
             the mean-centred data matrix
         """
-        centred_data = self.data - np.mean(self.data, axis=0)
-        U, s, V = np.linalg.svd(centred_data, False)
-        S = np.diag(s)
-        return U * S
+        L, PC = np.linalg.eigh(np.cov(self.data.T))
+        # Compute regular PCA
+        L, PC  = np.linalg.eigh(np.cov(self.data.T))
+        centre = np.mean(self.data, axis=0)
 
-    def compute_pc(self):
-        """
-        Robustly computes the principal components of the data matrix.
-        This is primarily broken up into one of several ways, depending on the
-        dimensionality of the data (whether p > n or p < n)
-        """
-        Z = reduce_to_affine_subspace()
+        # We want PCs from largest to smallest
+        arg_order = np.argsort(L)[::-1]
+        # New data matrix
+        Z = np.dot((self.data - centre), PC[:,arg_order])
+
+        return Z
 
     def num_least_outlying_points(self):
         """
@@ -86,10 +83,10 @@ class ROBPCA(object):
         h : number of least outlying points.
         """
         n = self.data.shape[0]
-        return np.max([self.alpha * n, (n + self.kmax + 1) / 2])
+        return int(np.max([self.alpha * n, (n + self.kmax + 1) / 2]))
 
     @staticmethod
-    def direction_through_hyperplane(Z):
+    def direction_through_hyperplane(X):
         """
         Calculates a direction vector between two points in Z, where Z is an
         n x p matrix. This direction is projected upon to find the number of
@@ -98,7 +95,7 @@ class ROBPCA(object):
         Parameters
         ----------
 
-        Z : Affine subspace of mean-centred data-matrix
+        X : Affine subspace of mean-centred data-matrix
 
         Returns
         --------
@@ -111,19 +108,45 @@ class ROBPCA(object):
 
         d = None
         if n > p:
-            P    = np.array(Z[choice(n,p), :])
+            P    = np.array(X[choice(n,p), :])
             Q, R = np.linalg.qr(P)
 
             if np.linalg.matrix_rank(Q) == p:
                 d = np.linalg.solve(Q, np.ones(p))
         else:
-            P   = np.array(Z[choice(n,2), :])
+            P   = np.array(X[choice(n,2), :])
             tmp = P[1, :] - P[0, :]
             N   = np.sqrt(np.dot(E,E))
 
             if N > 1e-8:
                 d = tmp / N
         return d
+
+    def compute_pc(self):
+        """
+        Robustly computes the principal components of the data matrix.
+        This is primarily broken up into one of several ways, depending on the
+        dimensionality of the data (whether p > n or p < n)
+        """
+        Z              = reduce_to_affine_subspace()
+        n, p           = Z.shape
+        self.h         = num_least_outlying_points()
+        num_directions = min(250, n * (n - 1) / 2)
+
+        # Find least outlying points --> Break this off later into separate function
+        B = np.array([ROBPCA.direction_through_hyperplane(Z)
+                        for _ in range(num_directions)])
+        B_norm     = np.linalg.norm(B, axis = 1)
+        index_norm = B_norm > 1e-12
+        A          = np.dot(np.diag(1 / B_norm[index_norm]), B[index_norm, :])
+
+        #
+        Y = np.dot(Z, A.T)
+
+        t_mcd = np.zeros()
+        for _ in range(Y.shape[1]):
+
+
 
     def find_least_outlying_points(self, Z):
         """
