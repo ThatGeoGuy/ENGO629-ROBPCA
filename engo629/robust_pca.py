@@ -9,7 +9,7 @@ Peter J. Rousseeuw and Karlien Vandem Branden (2005)
 """
 
 import numpy as np
-from sklearn.covariance import MinCovDet
+from sklearn.covariance import fast_mcd
 from np.random import choice
 
 class ROBPCA(object):
@@ -18,12 +18,12 @@ class ROBPCA(object):
     Rousseeuw, and Karlien Vandem Branden (2005)
     """
 
-    def __init__(self, X, kmax=10, alpha=0.75):
+    def __init__(self, X, kmax=10, alpha=0.75, num_directions=250):
         """
         Initializes the class instance with the data you wish to compute the
         ROBPCA algorithm over.
 
-        Arguments:
+        Parameters
         ----------
 
         X : An n x p data matrix (where n is number of data points and p is
@@ -43,6 +43,8 @@ class ROBPCA(object):
         self.data  = X
         self.kmax  = kmax
         self.alpha = alpha
+
+        self.num_directions = num_directions
         return
 
     def reduce_to_affine_subspace(self):
@@ -52,7 +54,7 @@ class ROBPCA(object):
         decomposition of the mean-centred data-matrix and use Z = UD as our
         new data matrix where Z is an n by r0 sized matrix.
 
-        Returns:
+        Returns
         --------
 
         Z : Z is the product of U and D of the singular value decomposition of
@@ -72,7 +74,7 @@ class ROBPCA(object):
             alpha * n           OR
             (n + kmax + 1) / 2
 
-        Returns:
+        Returns
         --------
 
         h : number of least outlying points.
@@ -81,18 +83,18 @@ class ROBPCA(object):
         return np.max([self.alpha * n, (n + self.kmax + 1) / 2])
 
     @staticmethod
-    def direction_coefficients_through_hyperplane(Z):
+    def direction_through_hyperplane(Z):
         """
         Calculates a direction vector between two points in Z, where Z is an
         n x p matrix. This direction is projected upon to find the number of
         least outlying points using the Stahel-Donoho outlyingness measure.
 
-        Arguments:
+        Parameters
         ----------
 
         Z : Affine subspace of mean-centred data-matrix
 
-        Returns:
+        Returns
         --------
 
         p0 : point of origin of the direction vector d
@@ -123,14 +125,27 @@ class ROBPCA(object):
         Does this by first computing the modified Stahel-Donoho
         affine-invariant outlyingness.
 
-        Arguments:
+        Parameters
         ----------
 
         Z : Affine subspace of mean-centred data-matrix.
 
-        Returns:
+        Returns
         --------
 
         H0 : set of data points from self.data which have the least
              outlyingness
         """
+        loc = np.zeros(self.num_directions)
+        cov = np.zeros(self.num_directions)
+        v   = np.zeros((self.num_directions, Z.shape[1]))
+
+        h = num_least_outlying_points()
+
+        for i in range(self.num_directions):
+            C       = np.matrix(np.dot(Z, v[i, :])).T
+            v[i, :] = ROBPCA.direction_through_hyperplane(Z)
+            loc[i], cov[i], _, _ = fast_mcd(C)
+
+        outl = np.zeros(Z.shape[1])
+
