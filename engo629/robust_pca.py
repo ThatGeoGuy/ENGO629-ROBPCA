@@ -18,7 +18,7 @@ class ROBPCA(object):
     Rousseeuw, and Karlien Vandem Branden (2005)
     """
 
-    def __init__(self, X, kmax=10, alpha=0.75, num_directions=250):
+    def __init__(self, X, kmax=10, alpha=0.75):
         """
         Initializes the class instance with the data you wish to compute the
         ROBPCA algorithm over.
@@ -26,25 +26,23 @@ class ROBPCA(object):
         Parameters
         ----------
 
-        X : An n x p data matrix (where n is number of data points and p is
-            number of dimensions in data) which is to be reduced.
-
-        kmax : Maximal number of components that will be computed. Set to 10
-               by default
-
-        alpha : Assists in determining step 2. The higher alpha is, the more
-                efficient the estimates will be for uncontaminated data.
-                However, lower values for alpha make the algorithm more robust.
-                Can be any real value in the range [0.5, 1].
+        X      : An n x p data matrix (where n is number of data points and p is
+                 number of dimensions in data) which is to be reduced.
+        kmax   : Maximal number of components that will be computed. Set to 10
+                 by default
+        alpha  : Assists in determining step 2. The higher alpha is, the more
+                 efficient the estimates will be for uncontaminated data.
+                 However, lower values for alpha make the algorithm more robust.
+                 Can be any real value in the range [0.5, 1].
         """
+        if kmax < 1:
+            raise ValueError("ROBPCA: kmax must be greater than 1 (default is 10).")
         if not (0.5 <= alpha <= 1.0):
             raise ValueError("ROBPCA: alpha must be a value in the range [0.5, 1.0]")
 
         self.data  = X
         self.kmax  = kmax
         self.alpha = alpha
-
-        self.num_directions = num_directions
         return
 
     def reduce_to_affine_subspace(self):
@@ -64,6 +62,14 @@ class ROBPCA(object):
         U, s, V = np.linalg.svd(centred_data, False)
         S = np.diag(s)
         return U * S
+
+    def compute_pc(self):
+        """
+        Robustly computes the principal components of the data matrix.
+        This is primarily broken up into one of several ways, depending on the
+        dimensionality of the data (whether p > n or p < n)
+        """
+        Z = reduce_to_affine_subspace()
 
     def num_least_outlying_points(self):
         """
