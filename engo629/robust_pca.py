@@ -9,7 +9,7 @@ Peter J. Rousseeuw and Karlien Vandem Branden (2005)
 """
 
 import numpy as np
-from sklearn.covariance import fast_mcd
+from sklearn.covariance import fast_mcd, MinCovDet
 from np.random import choice
 
 class ROBPCA(object):
@@ -47,8 +47,8 @@ class ROBPCA(object):
 
     def reduce_to_affine_subspace(self):
         """
-        Takes the mean-centred data-matrix and computes the affine subspace
-        spanned by n observations.
+        Takes the data-matrix and computes the affine subspace spanned by n
+        observations of the mean-centred data.
 
         Returns
         --------
@@ -56,7 +56,6 @@ class ROBPCA(object):
         Z : Z is the product of U and D of the singular value decomposition of
             the mean-centred data matrix
         """
-        L, PC = np.linalg.eigh(np.cov(self.data.T))
         # Compute regular PCA
         L, PC  = np.linalg.eigh(np.cov(self.data.T))
         centre = np.mean(self.data, axis=0)
@@ -142,11 +141,23 @@ class ROBPCA(object):
 
         #
         Y = np.dot(Z, A.T)
+        ny, ry = Y.shape
 
-        t_mcd = np.zeros()
-        for _ in range(Y.shape[1]):
+        # Set up lists for t_mcd and s_mcd
+        t_mcd = np.zeros(ry)
+        s_mcd = np.zeros(ry)
 
+        for i in range(ry):
+            # Due to a bug in MinCovDet() we have to use the following
+            t_mcd[i], s_mcd[i], _, _ = \
+                    fast_mcd(np.matrix(Y[:, i]).T, support_fraction=h)
 
+        # Test if any s_mcd ~ 0
+        if np.any(s_mcd == 0):
+            pass
+        else:
+            outl = np.max(np.abs(Y - t_mcd) / s_mcd, axis=1)
+            H0 = np.argsort(outl)[::-1][0:h]
 
     def find_least_outlying_points(self, Z):
         """
