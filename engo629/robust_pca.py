@@ -31,12 +31,18 @@ class ROBPCA(object):
 
         X      : An n x p data matrix (where n is number of data points and p
                  is number of dimensions in data) which is to be reduced.
+        k      : Number of principal components to compute. If k is missing,
+                 the algorithm itself will determine the number of components
+                 by finding a k such that L_k / L_1 > 1e-3 and (sum_1:k L_j /
+                 sum_1:r L_j >= 0.8)
         kmax   : Maximal number of components that will be computed. Set to 10
                  by default
         alpha  : Assists in determining step 2. The higher alpha is, the more
                  efficient the estimates will be for uncontaminated data.
-                 However, lower values for alpha make the algorithm more robust.
-                 Can be any real value in the range [0.5, 1].
+                 However, lower values for alpha make the algorithm more
+                 robust. Can be any real value in the range [0.5, 1].
+        mcd    : Specifies whether or not to use the MCD covariance matrix to
+                 compute the principal components when p << n.
         """
         if k < 0:
             raise ValueError("ROBPCA: number of dimensions k must be greater than or equal to 0.")
@@ -44,6 +50,8 @@ class ROBPCA(object):
             raise ValueError("ROBPCA: kmax must be greater than 1 (default is 10).")
         if not (0.5 <= alpha <= 1.0):
             raise ValueError("ROBPCA: alpha must be a value in the range [0.5, 1.0].")
+        if mcd is not True or mcd is not False:
+            raise ValueError("ROBPCA: mcd must be either True or False.")
 
         if k > kmax:
             print("ROBPCA: WARNING - k is greater than kmax, setting k to kmax.",
@@ -54,6 +62,7 @@ class ROBPCA(object):
         self.k      = k
         self.kmax   = kmax
         self.alpha  = alpha
+        self.mcd    = mcd
         return
 
     @staticmethod
@@ -71,8 +80,10 @@ class ROBPCA(object):
         Returns
         --------
 
-        Z : Z is the affine subspace of the data matrix X. It is the same data
-            as X but represents itself within its own dimensionality.
+        Z   : Z is the affine subspace of the data matrix X. It is the same
+              data as X but represents itself within its own dimensionality.
+        rot : Specifies the PCs computed here that were used to rotate X into
+              the subspace Z.
         """
         # Compute regular PCA
         # L  -> lambdas (eigenvalues)
@@ -83,7 +94,7 @@ class ROBPCA(object):
         # New data matrix
         Z = np.dot((X - centre), PC)
 
-        return Z
+        return Z, PC
 
     def num_least_outlying_points(self):
         """
@@ -200,6 +211,11 @@ class ROBPCA(object):
         dimensionality of the data (whether p > n or p < n)
         """
         X  = ROBPCA.reduce_to_affine_subspace(self.data)
+
+        n, p = X.shape
+
+        if p < min(np.floor(n / 5), self.kmax):
+            mcd = MinCovDet()
 
         if np.linalg.rank(X) == 0:
             raise ValueError("All data points collapse!")
