@@ -8,6 +8,7 @@ Defines a class which computes the ROBPCA method as defined by Mia Hubert,
 Peter J. Rousseeuw and Karlien Vandem Branden (2005)
 """
 
+import sys
 import numpy as np
 from sklearn.covariance import fast_mcd, MinCovDet
 from np.random import choice
@@ -20,7 +21,7 @@ class ROBPCA(object):
     Rousseeuw, and Karlien Vandem Branden (2005)
     """
 
-    def __init__(self, X, kmax=10, alpha=0.75, mcd=True):
+    def __init__(self, X, k=0, kmax=10, alpha=0.75, mcd=True):
         """
         Initializes the class instance with the data you wish to compute the
         ROBPCA algorithm over.
@@ -37,12 +38,20 @@ class ROBPCA(object):
                  However, lower values for alpha make the algorithm more robust.
                  Can be any real value in the range [0.5, 1].
         """
+        if k < 0:
+            raise ValueError("ROBPCA: number of dimensions k must be greater than or equal to 0.")
         if kmax < 1:
             raise ValueError("ROBPCA: kmax must be greater than 1 (default is 10).")
         if not (0.5 <= alpha <= 1.0):
-            raise ValueError("ROBPCA: alpha must be a value in the range [0.5, 1.0]")
+            raise ValueError("ROBPCA: alpha must be a value in the range [0.5, 1.0].")
+
+        if k > kmax:
+            print("ROBPCA: WARNING - k is greater than kmax, setting k to kmax.",
+                    file=sys.stderr)
+            k = kmax
 
         self.data   = X
+        self.k      = k
         self.kmax   = kmax
         self.alpha  = alpha
         return
@@ -68,7 +77,7 @@ class ROBPCA(object):
         # Compute regular PCA
         # L  -> lambdas (eigenvalues)
         # PC -> principal components (eigenvectors)
-        L, PC  = principal_components(X)
+        _, PC  = principal_components(X)
         centre = np.mean(X, axis=0)
 
         # New data matrix
@@ -191,6 +200,10 @@ class ROBPCA(object):
         dimensionality of the data (whether p > n or p < n)
         """
         X  = ROBPCA.reduce_to_affine_subspace(self.data)
+
+        if np.linalg.rank(X) == 0:
+            raise ValueError("All data points collapse!")
+
         H0 = find_least_outlying_points(X)
 
         L0, P0    = principal_components(X[H0, :])
@@ -200,5 +213,9 @@ class ROBPCA(object):
             X_star = np.dot(X - centre_Xh, P0[:, kmax])
         else:
             X_star = np.dot(X - centre_Xh, P0)
+
+        Lfinal, PCfinal = principal_components(
+                X_star,
+                lambda x: MinCovDet(support_fraction=self.alpha).fit(x.T).covariance_)
 
 
