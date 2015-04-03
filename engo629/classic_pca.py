@@ -22,8 +22,9 @@ def principal_components(X, cov_func=np.cov):
     X        : an n by p array-like object. 'p' number of principal components and
                their variances will be returned.
     cov_func : A function which can be passed in to calculate the covariance
-               matrix of the data in X. It should accept the transpose of X,
-               and defaults to Numpy's covariance function `numpy.cov`
+               matrix of the data in X. It should just accept X, and defaults to
+               Numpy's covariance function `numpy.cov`. Note that np.cov accepts
+               transpose(X) by default, but this interface assumes the opposite.
 
     Return:
     -------
@@ -34,6 +35,9 @@ def principal_components(X, cov_func=np.cov):
           component. Sorted and returned in descending order of L.
 
     """
-    L, PCs    = np.linalg.eigh(cov_func(X.T))
+    if cov_func = None:
+        cov_func = lambda x: np.cov(x.T)
+
+    L, PCs    = np.linalg.eigh(cov_func(X))
     arg_order = np.argsort(L)[::-1]
     return L[arg_order], PCs[:, arg_order]
