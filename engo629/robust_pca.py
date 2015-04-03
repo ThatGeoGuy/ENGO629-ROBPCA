@@ -68,13 +68,11 @@ class ROBPCA(object):
         # Compute regular PCA
         # L  -> lambdas (eigenvalues)
         # PC -> principal components (eigenvectors)
-        L, PC  = principal_components(self.data)
-        centre = np.mean(self.data, axis=0)
+        L, PC  = principal_components(X)
+        centre = np.mean(X, axis=0)
 
-        # We want PCs from largest to smallest
-        arg_order = np.argsort(L)[::-1]
         # New data matrix
-        Z = np.dot((self.data - centre), PC[:,arg_order])
+        Z = np.dot((X - centre), PC)
 
         return Z
 
@@ -132,45 +130,7 @@ class ROBPCA(object):
                 d = tmp / N
         return d
 
-    def compute_pc(self):
-        """
-        Robustly computes the principal components of the data matrix.
-        This is primarily broken up into one of several ways, depending on the
-        dimensionality of the data (whether p > n or p < n)
-        """
-        Z              = reduce_to_affine_subspace(self.data)
-        n, p           = Z.shape
-        self.h         = num_least_outlying_points()
-        num_directions = min(250, n * (n - 1) / 2)
-
-        # Find least outlying points --> Break this off later into separate function
-        B = np.array([ROBPCA.direction_through_hyperplane(Z)
-                        for _ in range(num_directions)])
-        B_norm     = np.linalg.norm(B, axis = 1)
-        index_norm = B_norm > 1e-12
-        A          = np.dot(np.diag(1 / B_norm[index_norm]), B[index_norm, :])
-
-        #
-        Y = np.dot(Z, A.T)
-        ny, ry = Y.shape
-
-        # Set up lists for t_mcd and s_mcd
-        t_mcd = np.zeros(ry)
-        s_mcd = np.zeros(ry)
-
-        for i in range(ry):
-            # Due to a bug in MinCovDet() we have to use the following
-            t_mcd[i], s_mcd[i], _, _ = \
-                    fast_mcd(np.matrix(Y[:, i]).T, support_fraction=h)
-
-        # Test if any s_mcd are 0
-        if np.any(s_mcd == 0):
-            pass
-        else:
-            outl = np.max(np.abs(Y - t_mcd) / s_mcd, axis=1)
-            H0 = np.argsort(outl)[::-1][0:h]
-
-    def find_least_outlying_points(self, Z):
+    def find_least_outlying_points(self, X):
         """
         Finds the `h` number of points in the dataset that are least-outlying.
         Does this by first computing the modified Stahel-Donoho
@@ -179,24 +139,66 @@ class ROBPCA(object):
         Parameters
         ----------
 
-        Z : Affine subspace of mean-centred data-matrix.
+        X : The data matrix with which you want to find the least outlying
+            points using the modified Stahel-Donoho outlyingness measure
 
         Returns
         --------
 
-        H0 : set of data points from self.data which have the least
+        H0 : indices of data points from X which have the least
              outlyingness
         """
-        loc = np.zeros(self.num_directions)
-        cov = np.zeros(self.num_directions)
-        v   = np.zeros((self.num_directions, Z.shape[1]))
+        n, p           = X.shape
+        self.h         = num_least_outlying_points()
+        num_directions = min(250, n * (n - 1) / 2)
 
-        h = num_least_outlying_points()
+        # Find least outlying points --> Break this off later into separate function
+        B = np.array([ROBPCA.direction_through_hyperplane(X)
+                        for _ in range(num_directions)])
+        B_norm     = np.linalg.norm(B, axis = 1)
+        index_norm = B_norm > 1e-12
+        A          = np.dot(np.diag(1 / B_norm[index_norm]), B[index_norm, :])
 
-        for i in range(self.num_directions):
-            C       = np.matrix(np.dot(Z, v[i, :])).T
-            v[i, :] = ROBPCA.direction_through_hyperplane(Z)
-            loc[i], cov[i], _, _ = fast_mcd(C)
+        # Used as a matrix because there's a bug in fast_mcd / MinCovDet
+        # The bug is basically due to single row / column arrays not
+        # maintaining the exact shape information (e.g. np.zeros(3).shape
+        # returns (3,) and not (3,1) or (1,3).
+        Y = np.matrix(np.dot(Z, A.T))
+        ny, ry = Y.shape
 
-        outl = np.zeros(Z.shape[1])
+        # Set up lists for univariate t_mcd and s_mcd
+        t_mcd = np.zeros(ry)
+        s_mcd = np.zeros(ry)
+
+        for i in range(ry):
+            mcd = MinCovDet(support_fraction=h).fit(Y[:,i])
+            t_mcd[i] = mcd.location_
+            s_mcd[i] = mcd.covariance_
+
+        # Supposedly if any of the s_mcd values is zero we're supposed to
+        # project all the data points onto the hyperplane defined by the
+        # direction orthogonal to A[i, :]. However, the reference
+        # implementation in LIBRA does not explicitly do this, and quite
+        # frankly the code is so terrible I've moved on for the time being.
+        outl = np.max(np.abs(np.array(Y) - t_mcd) / s_mcd, axis=1)
+        H0 = np.argsort(outl)[::-1][0:h]
+        return H0
+
+    def compute_pc(self):
+        """
+        Robustly computes the principal components of the data matrix.
+        This is primarily broken up into one of several ways, depending on the
+        dimensionality of the data (whether p > n or p < n)
+        """
+        X  = ROBPCA.reduce_to_affine_subspace(self.data)
+        H0 = find_least_outlying_points(X)
+
+        L0, P0    = principal_components(X[H0, :])
+        centre_Xh = np.mean(X[H0, :], axis=0)
+
+        if self.kmax < P0.shape[1]:
+            X_star = np.dot(X - centre_Xh, P0[:, kmax])
+        else:
+            X_star = np.dot(X - centre_Xh, P0)
+
 
