@@ -12,6 +12,8 @@ import numpy as np
 from sklearn.covariance import fast_mcd, MinCovDet
 from np.random import choice
 
+from .classic_pca import principal_components
+
 class ROBPCA(object):
     """
     Implements the ROBPCA algorithm as defined by Mia Hubert, Peter J.
@@ -45,19 +47,28 @@ class ROBPCA(object):
         self.alpha  = alpha
         return
 
-    def reduce_to_affine_subspace(self):
+    @staticmethod
+    def reduce_to_affine_subspace(X):
         """
         Takes the data-matrix and computes the affine subspace spanned by n
         observations of the mean-centred data.
 
+        Parameters
+        ----------
+
+        X : X is an n by p data matrix where n is the number of observations
+            and p is the number of dimensions in the data.
+
         Returns
         --------
 
-        Z : Z is the product of U and D of the singular value decomposition of
-            the mean-centred data matrix
+        Z : Z is the affine subspace of the data matrix X. It is the same data
+            as X but represents itself within its own dimensionality.
         """
         # Compute regular PCA
-        L, PC  = np.linalg.eigh(np.cov(self.data.T))
+        # L  -> lambdas (eigenvalues)
+        # PC -> principal components (eigenvectors)
+        L, PC  = principal_components(self.data)
         centre = np.mean(self.data, axis=0)
 
         # We want PCs from largest to smallest
@@ -127,7 +138,7 @@ class ROBPCA(object):
         This is primarily broken up into one of several ways, depending on the
         dimensionality of the data (whether p > n or p < n)
         """
-        Z              = reduce_to_affine_subspace()
+        Z              = reduce_to_affine_subspace(self.data)
         n, p           = Z.shape
         self.h         = num_least_outlying_points()
         num_directions = min(250, n * (n - 1) / 2)
@@ -152,7 +163,7 @@ class ROBPCA(object):
             t_mcd[i], s_mcd[i], _, _ = \
                     fast_mcd(np.matrix(Y[:, i]).T, support_fraction=h)
 
-        # Test if any s_mcd ~ 0
+        # Test if any s_mcd are 0
         if np.any(s_mcd == 0):
             pass
         else:
