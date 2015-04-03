@@ -19,9 +19,8 @@ def principal_components(X, cov_func=np.cov):
     Args:
     -----
 
-    X : an n by p array-like object. 'p' number of principal components and
-        their variances will be returned.
-
+    X        : an n by p array-like object. 'p' number of principal components and
+               their variances will be returned.
     cov_func : A function which can be passed in to calculate the covariance
                matrix of the data in X. It should accept the transpose of X,
                and defaults to Numpy's covariance function `numpy.cov`
@@ -29,12 +28,12 @@ def principal_components(X, cov_func=np.cov):
     Return:
     -------
 
-    evals : Variance component of principal component
-
-    evecs : Principal component vectors. Each column corresponding to the
-            respective variance component is the unit vector of the principal
-            component.
+    L   : Variance component of principal component in descending order
+    PCs : Principal component vectors. Each column corresponding to the
+          respective variance component is the unit vector of the principal
+          component. Sorted and returned in descending order of L.
 
     """
-    evals, evecs = np.linalg.eigh(cov_func(X.T))
-    return evals, evecs
+    L, PCs    = np.linalg.eigh(cov_func(X.T))
+    arg_order = np.argsort(L)[::-1]
+    return L[arg_order], PCs[:, arg_order]
