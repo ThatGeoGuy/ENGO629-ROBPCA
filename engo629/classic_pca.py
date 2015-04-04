@@ -10,7 +10,7 @@ analysis.
 
 import numpy as np
 
-def principal_components(X, cov_func=np.cov):
+def principal_components(X, cov_func=None):
     """
     Calculates the principal components of data stored in an array X of size
     n by p, where n (the number of rows) corresponds to the number of data
@@ -35,7 +35,7 @@ def principal_components(X, cov_func=np.cov):
           component. Sorted and returned in descending order of L.
 
     """
-    if cov_func = None:
+    if not cov_func:
         cov_func = lambda x: np.cov(x.T)
 
     L, PCs    = np.linalg.eigh(cov_func(X))

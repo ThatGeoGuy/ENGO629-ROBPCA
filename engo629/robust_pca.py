@@ -210,12 +210,14 @@ class ROBPCA(object):
         This is primarily broken up into one of several ways, depending on the
         dimensionality of the data (whether p > n or p < n)
         """
-        X  = ROBPCA.reduce_to_affine_subspace(self.data)
+        X, rot = ROBPCA.reduce_to_affine_subspace(self.data)
 
-        n, p = X.shape
+        n, p   = X.shape
+        self.h = num_least_outlying_points()
 
         if p < min(np.floor(n / 5), self.kmax):
-            mcd = MinCovDet()
+            mcd = MinCovDet(support_fraction=self.alpha).fit(X)
+
 
         if np.linalg.rank(X) == 0:
             raise ValueError("All data points collapse!")
