@@ -172,7 +172,6 @@ class ROBPCA(object):
         self.h         = num_least_outlying_points()
         num_directions = min(250, n * (n - 1) / 2)
 
-        # Find least outlying points --> Break this off later into separate function
         B = np.array([ROBPCA.direction_through_hyperplane(X)
                         for _ in range(num_directions)])
         B_norm     = np.linalg.norm(B, axis = 1)
@@ -191,7 +190,7 @@ class ROBPCA(object):
         s_mcd = np.zeros(ry)
 
         for i in range(ry):
-            mcd = MinCovDet(support_fraction=h).fit(Y[:,i])
+            mcd = MinCovDet(support_fraction=self.alpha).fit(Y[:,i])
             t_mcd[i] = mcd.location_
             s_mcd[i] = mcd.covariance_
 
@@ -211,29 +210,57 @@ class ROBPCA(object):
         dimensionality of the data (whether p > n or p < n)
         """
         X, rot = ROBPCA.reduce_to_affine_subspace(self.data)
-
-        n, p   = X.shape
-        self.h = num_least_outlying_points()
-
-        if p < min(np.floor(n / 5), self.kmax):
-            mcd = MinCovDet(support_fraction=self.alpha).fit(X)
-
+        centre = np.mean(self.data, axis=0)
 
         if np.linalg.rank(X) == 0:
             raise ValueError("All data points collapse!")
 
+        n, p   = X.shape
+        self.h = num_least_outlying_points()
+
+        # Use MCD instead of ROBPCA if p << n
+        if p < min(np.floor(n / 5), self.kmax) and self.mcd:
+            mcd = MinCovDet(support_fraction=self.alpha).fit(X)
+
+            loc = mcd.location_
+            cov = np.
+            L, PCs = principal_components(X, lambda x: cov)
+            result = {
+                    'location': np.dot(rot,loc) + centre,
+                    'covariance': np.dot(rot, cov),
+                    'eigenvalues': L,
+                    'loadings': np.dot(rot, PCs),
+                    }
+            return result
+
+        # Otherwise just continue with ROBPCA
         H0 = find_least_outlying_points(X)
+        Xh = X[H0, :]
 
-        L0, P0    = principal_components(X[H0, :])
-        centre_Xh = np.mean(X[H0, :], axis=0)
+        Lh, Ph    = principal_components(Xh)
+        centre_Xh = np.mean(Xh, axis=0)
 
-        if self.kmax < P0.shape[1]:
-            X_star = np.dot(X - centre_Xh, P0[:, kmax])
-        else:
-            X_star = np.dot(X - centre_Xh, P0)
+        self.kmax = np.min(np.sum(Lh > 1e-12), self.kmax)
 
-        Lfinal, PCfinal = principal_components(
-                X_star,
-                lambda x: MinCovDet(support_fraction=self.alpha).fit(x.T).covariance_)
+        # If k was not set or chosen to be 0, then we should calculate it
+        # Basically we test if the ratio of the k-th eigenvalue to the 1st
+        # eigenvalue (sorted decreasingly) is larger than 1e-3 and if the
+        # fraction of cumulative dispersion is greater than 80%
+        if self.k == 0:
+            test, = np.where(Lh / Lh[0] <= 1e-3)
 
+            if len(test):
+                self.k = min(np.sum(Lh > 1e-12), int(test + 1), self.kmax)
+            else:
+                self.k = min(np.sum(Lh > 1e-12), self.kmax)
 
+            cumulative = np.cumsum(Lh[1:self.k]) / np.sum(Lh)
+            if cumulative[self.k-1] > 0.8:
+                self.k = int(np.where(cumulative >= 0.8)[0])
+
+        centre += np.mean(Xh, axis=0)
+        rot     = np.dot(rot, Ph)
+
+        X2  = np.dot(X - np.mean(Xh, axis = 0), Ph)
+        X2  = X2[:, 1:self.k]
+        rot = rot[:, 1:self.k]
