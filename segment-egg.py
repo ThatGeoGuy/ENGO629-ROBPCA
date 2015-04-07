@@ -59,6 +59,12 @@ def main(filename, alpha, tol):
                 (np.norm(LPC[:, 2]) * np.norm(gPC[:, 2])))
         theta *= 180 / np.pi
 
+        # Check that the normals aren't out of phase
+        if theta >= 180:
+            theta -= 180
+        elif theta <= -180:
+            theta += 180
+
         if theta > tol:
             marked_data[i, 3] = 0
         else:
