@@ -223,13 +223,13 @@ class ROBPCA(object):
             mcd = MinCovDet(support_fraction=self.alpha).fit(X)
 
             loc = mcd.location_
-            cov = np.
+            cov = mcd.covariance_
             L, PCs = principal_components(X, lambda x: cov)
             result = {
-                    'location': np.dot(rot,loc) + centre,
-                    'covariance': np.dot(rot, cov),
-                    'eigenvalues': L,
-                    'loadings': np.dot(rot, PCs),
+                    'location'    : np.dot(rot,loc) + centre,
+                    'covariance'  : np.dot(rot, cov),
+                    'eigenvalues' : L,
+                    'loadings'    : np.dot(rot, PCs),
                     }
             return result
 
@@ -264,3 +264,16 @@ class ROBPCA(object):
         X2  = np.dot(X - np.mean(Xh, axis = 0), Ph)
         X2  = X2[:, 1:self.k]
         rot = rot[:, 1:self.k]
+
+        mcd = MinCovDet(support_fraction=(self.h / n)).fit(X2)
+        loc = mcd.location_
+        cov = mcd.covariance_
+
+        L, PCs = principal_components(X2, lambda x: cov)
+        result = {
+                'location'    : np.dot(rot, loc) + centre,
+                'covariance'  : np.dot(rot,cov),
+                'eigenvalues' : L,
+                'loadings'    : np.dot(rot, PCs),
+                }
+        return result
