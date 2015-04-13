@@ -57,7 +57,7 @@ def main(filename, alpha, ttol, dtol, classic, ofile):
     print("Global eigenvalues: {}".format(gL))
     print("Location is: {}".format(loc))
 
-    marked_data        = np.ones((data.shape[0], 4))
+    marked_data        = 255 * np.ones((data.shape[0], 4))
     marked_data[:,0:3] = data.copy()
 
     for i, pt in enumerate(data):
@@ -73,7 +73,7 @@ def main(filename, alpha, ttol, dtol, classic, ofile):
         theta *= 180 / np.pi
 
         loc  = abs(np.dot(pt, gPC[:,2]))
-        dist = abs(loc - proj)
+        dist = loc - proj
 
         # Check that the normals aren't out of phase
         if theta > 90:
@@ -83,6 +83,8 @@ def main(filename, alpha, ttol, dtol, classic, ofile):
 
         if ((abs(theta) > ttol) and (LL[2] > gL[2])) or dist > dtol:
             marked_data[i, 3] = 0
+        if dist < -dtol:
+            marked_data[i, 3] = 128
 
     np.savetxt(ofile, marked_data, '%.6f')
     return 0
