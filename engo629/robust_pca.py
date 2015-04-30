@@ -11,7 +11,7 @@ Peter J. Rousseeuw and Karlien Vandem Branden (2005)
 import sys
 import numpy as np
 from sklearn.covariance import fast_mcd, MinCovDet
-from np.random import choice
+from numpy.random import choice
 
 from .classic_pca import principal_components
 
